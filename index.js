@@ -196,8 +196,11 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'delete':
       if (params.hasOwnProperty('recursive') && params.recursive) {
+        if (storage.hasOwnProperty(path)) {
+          delete storage[path];
+          return next();
+        }
         var deleted = false;
-
         for (var key in storage) {
           if (p.dirname(key) === path) {
             delete storage[key];
@@ -205,7 +208,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
           }
         }
 
-        if (!deleted && !storage.hasOwnProperty(path)) {
+        if (!deleted) {
           return next(new Error('File does not exist: ' + path));
         }
 
