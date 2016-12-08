@@ -22,7 +22,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
         length: 24930,
         modificationTime: (new Date()).getTime(),
         owner: params['user.name'],
-        pathSuffix: '',
+        pathSuffix: p.basename(path),
         permission: '644',
         replication: 1,
         type: 'DIRECTORY'
@@ -52,12 +52,27 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
           length: 0,
           modificationTime: (new Date()).getTime(),
           owner: params['user.name'],
-          pathSuffix: '',
+          pathSuffix: p.basename(path),
           permission: '644',
           replication: 1,
           type: 'FILE',
           data: ''
         };
+        var dirn = p.dirname(path);
+        if (dirn && dirn !== '.' && !storage.hasOwnProperty(dirn)) {
+          storage[dirn] = {
+            accessTime: (new Date()).getTime(),
+            blockSize: 0,
+            group: 'supergroup',
+            length: 24930,
+            modificationTime: (new Date()).getTime(),
+            owner: params['user.name'],
+            pathSuffix: p.basename(dirn),
+            permission: '644',
+            replication: 1,
+            type: 'DIRECTORY'
+          };
+        }
       }
 
       req.on('data', function onData (data) {
@@ -79,7 +94,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'open':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       res.writeHead(200, {
@@ -116,7 +131,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'getfilestatus':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       var data = JSON.stringify({
@@ -134,7 +149,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'rename':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       if (storage.hasOwnProperty(params.destination)) {
@@ -149,7 +164,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'setpermission':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       storage[path].permission = params.permission;
@@ -158,7 +173,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'setowner':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       storage[path].owner = params.owner;
@@ -168,7 +183,7 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'createsymlink':
       if (!storage.hasOwnProperty(path)) {
-        return next(new Error('File doesn\'t exist'));
+        return next(new Error('File does not exist: ' + path));
       }
 
       if (storage.hasOwnProperty(params.destination)) {
@@ -181,8 +196,11 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
 
     case 'delete':
       if (params.hasOwnProperty('recursive') && params.recursive) {
+        if (storage.hasOwnProperty(path)) {
+          delete storage[path];
+          return next();
+        }
         var deleted = false;
-
         for (var key in storage) {
           if (p.dirname(key) === path) {
             delete storage[key];
@@ -190,8 +208,8 @@ module.exports = function memoryStorageHandler (err, path, operation, params, re
           }
         }
 
-        if (!deleted && !storage.hasOwnProperty(path)) {
-          return next(new Error('File doesn\'t exist'));
+        if (!deleted) {
+          return next(new Error('File does not exist: ' + path));
         }
 
       } else {
